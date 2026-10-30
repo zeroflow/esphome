@@ -12,6 +12,7 @@ from esphome.components.esp32 import (
     KEY_VARIANT,
     VARIANT_ESP32,
     VARIANT_ESP32C3,
+    VARIANT_ESP32C6,
     VARIANT_ESP32H2,
     VARIANT_ESP32S2,
     VARIANT_ESP32S3,
@@ -103,6 +104,32 @@ def test_default_strips(
     symbols = STRIP_DEFAULT[variant]
     lights = [_strip(f"strip{i}", symbols) for i in range(strips)]
     assert bool(run_check(variant, {"light": lights})) is warns
+
+
+def test_fan_controller_status_leds_and_neopixel_port_on_s2(
+    run_check: CheckRunner,
+) -> None:
+    """A fan controller with internal status LEDs and an external NeoPixel port.
+
+    Both strips left at the default of 192 need 6 of the 4 shared S2 blocks, so the
+    port fails at boot with 'no free tx channels'.
+    """
+    lights = [_strip("status_leds", 192), _strip("neopixel_port", 192)]
+    messages = run_check(VARIANT_ESP32S2, {"light": lights})
+    assert len(messages) == 1
+    assert "'status_leds' (192), 'neopixel_port' (192)" in messages[0]
+    assert "rmt_symbols: 128" in messages[0]
+
+
+@pytest.mark.parametrize(
+    ("variant", "symbols"), [(VARIANT_ESP32S2, 128), (VARIANT_ESP32C6, 48)]
+)
+def test_fan_controller_with_fitting_rmt_symbols(
+    run_check: CheckRunner, variant: str, symbols: int
+) -> None:
+    """The same fan controller with rmt_symbols set to fit does not warn."""
+    lights = [_strip("status_leds", symbols), _strip("neopixel_port", symbols)]
+    assert not run_check(variant, {"light": lights})
 
 
 def test_warning_names_components_and_suggests_value(run_check: CheckRunner) -> None:
